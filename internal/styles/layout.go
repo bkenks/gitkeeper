@@ -7,6 +7,19 @@ import "github.com/bkenks/gitkeeper/internal/constants"
 // itself. Both dimensions are at least 1.
 func ContentSize(reservedRows int) (width, height int) {
 	x, y := DocStyle.GetFrameSize()
+	return sizeIn(x, y, reservedRows)
+}
+
+// FullContentSize is ContentSize for a screen rendered in FullDocStyle: it
+// gives up none of DocStyle's vertical margin, so it only subtracts
+// FullDocStyle's frame, the app's footer, and reservedRows from the window.
+// Both dimensions are at least 1.
+func FullContentSize(reservedRows int) (width, height int) {
+	x, y := FullDocStyle.GetFrameSize()
+	return sizeIn(x, y, reservedRows)
+}
+
+func sizeIn(x, y, reservedRows int) (width, height int) {
 	width = max(constants.WindowSize.Width-x, 1)
 	height = max(constants.WindowSize.Height-y-constants.FooterReservedLines-reservedRows, 1)
 	return width, height

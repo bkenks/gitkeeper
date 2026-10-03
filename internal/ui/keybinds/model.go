@@ -137,7 +137,7 @@ func (m *Model) startEdit(index int) tea.Cmd {
 	}
 	m.editIndex = index
 	m.purpose = purposeEdit
-	formKeys := cancelableKeyMap()
+	formKeys := styles.FormKeyMap()
 	formKeys.Confirm.Accept.SetEnabled(false)
 	formKeys.Confirm.Reject.SetEnabled(false)
 	m.form = m.newForm(formKeys,
@@ -159,7 +159,7 @@ func (m *Model) startDelete(index int) tea.Cmd {
 	m.purpose = purposeDelete
 	m.isDeleteConfirmed = false
 	name := lipgloss.NewStyle().Bold(true).Render(m.keybinds[index].Name)
-	m.form = m.newForm(cancelableKeyMap(),
+	m.form = m.newForm(styles.FormKeyMap(),
 		huh.NewConfirm().
 			Title(fmt.Sprintf("Are you sure you'd like to delete %s?", name)).
 			Affirmative("Yes").
@@ -167,14 +167,6 @@ func (m *Model) startDelete(index int) tea.Cmd {
 			Value(&m.isDeleteConfirmed),
 	)
 	return m.form.Init()
-}
-
-// cancelableKeyMap is huh's default key map with esc cancelling the form, like
-// every other gitkeeper screen.
-func cancelableKeyMap() *huh.KeyMap {
-	formKeys := huh.NewDefaultKeyMap()
-	formKeys.Quit = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
-	return formKeys
 }
 
 func (m *Model) newForm(formKeys *huh.KeyMap, fields ...huh.Field) *huh.Form {

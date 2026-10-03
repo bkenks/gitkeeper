@@ -115,11 +115,38 @@ func colorFormFields(f *huh.FieldStyles) {
 	f.TextInput.Prompt = f.TextInput.Prompt.Foreground(Accent)
 }
 
-// FormKeyMap is huh's default key map with esc cancelling the form.
+// FormKeyMap is huh's default key map with esc cancelling the form, ↑/↓
+// moving between fields and ←/→ moving between a select's options.
 func FormKeyMap() *huh.KeyMap {
 	keys := huh.NewDefaultKeyMap()
 	keys.Quit = key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel"))
+
+	keys.Input.Prev, keys.Input.Next = formPrevKey(), formNextKey()
+	keys.Confirm.Prev, keys.Confirm.Next = formPrevKey(), formNextKey()
+	keys.Note.Prev, keys.Note.Next = formPrevKey(), formNextKey()
+	keys.Select.Prev, keys.Select.Next = formPrevKey(), formNextKey()
+	keys.MultiSelect.Prev, keys.MultiSelect.Next = formPrevKey(), formNextKey()
+
+	keys.Select.Up, keys.Select.Down = formOptionPrevKey(), formOptionNextKey()
+	keys.Select.Left, keys.Select.Right = formOptionPrevKey(), formOptionNextKey()
+	keys.MultiSelect.Up, keys.MultiSelect.Down = formOptionPrevKey(), formOptionNextKey()
 	return keys
+}
+
+func formPrevKey() key.Binding {
+	return key.NewBinding(key.WithKeys("up"), key.WithHelp("↑", "back"))
+}
+
+func formNextKey() key.Binding {
+	return key.NewBinding(key.WithKeys("down", "enter"), key.WithHelp("↓", "next"))
+}
+
+func formOptionPrevKey() key.Binding {
+	return key.NewBinding(key.WithKeys("left", "h"), key.WithHelp("←", "prev option"))
+}
+
+func formOptionNextKey() key.Binding {
+	return key.NewBinding(key.WithKeys("right", "l"), key.WithHelp("→", "next option"))
 }
 
 // SaveKey saves a form from whichever field has focus.

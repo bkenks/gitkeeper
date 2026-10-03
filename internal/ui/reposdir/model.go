@@ -25,7 +25,7 @@ type Model struct {
 // directory so a missing one can be created by just confirming it.
 func New(cfg config.Config, problem error) *Model {
 	m := &Model{dir: cfg.RepoRoot()}
-	formKeys := huh.NewDefaultKeyMap()
+	formKeys := styles.FormKeyMap()
 	formKeys.Quit = key.NewBinding(key.WithKeys("ctrl+c"), key.WithHelp("ctrl+c", "quit"))
 	m.form = huh.NewForm(huh.NewGroup(
 		huh.NewInput().Title("Where should gitkeeper keep your repos?").

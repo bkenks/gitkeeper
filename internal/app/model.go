@@ -436,7 +436,14 @@ func isPullProgress(msg tea.Msg) bool {
 
 func (m *ModelManager) View() tea.View {
 	active := m.active.View()
-	body := styles.DocStyle.Render(active.Content)
+	body := active.Content
+	// The clone screen renders full-bleed; everything else keeps DocStyle's
+	// generous vertical margins.
+	doc := styles.DocStyle
+	if m.state == domain.StateCloneRepo {
+		doc = styles.FullDocStyle
+	}
+	body = doc.Render(body)
 	// The footer region is a single reserved line (FooterReservedLines). A clone
 	// batch in flight owns it — showing a live gradient bar between the per-repo
 	// terminal handovers — otherwise it's the toast line.
@@ -446,10 +453,10 @@ func (m *ModelManager) View() tea.View {
 	}
 	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Left, body, footer))
 	v.AltScreen = true
-	if active.Cursor != nil {
-		v.Cursor = active.Cursor
-		v.Cursor.X += styles.DocStyle.GetMarginLeft()
-		v.Cursor.Y += styles.DocStyle.GetMarginTop()
+	if cursor := active.Cursor; cursor != nil {
+		v.Cursor = cursor
+		v.Cursor.X += doc.GetMarginLeft()
+		v.Cursor.Y += doc.GetMarginTop()
 	}
 	return v
 }

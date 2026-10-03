@@ -35,6 +35,12 @@ var (
 	DocStyle = lipgloss.NewStyle().
 			Margin(3, 1)
 
+	// FullDocStyle frames full-bleed screens the same way DocStyle does
+	// horizontally but with no vertical margin, so their content spans the
+	// terminal edge to edge. The clone screen's URL textarea uses this.
+	FullDocStyle = lipgloss.NewStyle().
+			Margin(0, 1)
+
 	// End "Terminal Window"
 	///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

@@ -12,7 +12,10 @@ import (
 
 var (
 	enterKey = tea.KeyPressMsg{Code: tea.KeyEnter}
+	upKey    = tea.KeyPressMsg{Code: tea.KeyUp}
 	downKey  = tea.KeyPressMsg{Code: tea.KeyDown}
+	rightKey = tea.KeyPressMsg{Code: tea.KeyRight}
+	tabKey   = tea.KeyPressMsg{Code: tea.KeyTab}
 	yesKey   = tea.KeyPressMsg{Code: 'y', Text: "y"}
 	noKey    = tea.KeyPressMsg{Code: 'n', Text: "n"}
 	escKey   = tea.KeyPressMsg{Code: tea.KeyEscape}
@@ -50,8 +53,8 @@ func pushingToast(t *testing.T, emitted []tea.Msg) string {
 
 func TestConfirmedBumpPushesNextTag(t *testing.T) {
 	cases := []struct {
-		downs int
-		want  string
+		rights int
+		want   string
 	}{
 		{0, "pushing v1.2.4 to origin…"},
 		{1, "pushing v1.3.0 to origin…"},
@@ -59,29 +62,51 @@ func TestConfirmedBumpPushesNextTag(t *testing.T) {
 	}
 	for _, c := range cases {
 		m := newTestModel(semver.Format{Prefix: "v"}, []string{"v1.2.3", "v1.0.0", "other"})
-		for range c.downs {
-			press(m, downKey)
+		for range c.rights {
+			press(m, rightKey)
 		}
 		press(m, enterKey)
 
 		emitted := press(m, yesKey)
 
 		if got := pushingToast(t, emitted); got != c.want {
-			t.Errorf("%d downs: toast = %q, want %q", c.downs, got, c.want)
+			t.Errorf("%d rights: toast = %q, want %q", c.rights, got, c.want)
 		}
 		if !leavesToRepoList(emitted) {
-			t.Errorf("%d downs: emitted %v, want a return to the repo list", c.downs, emitted)
+			t.Errorf("%d rights: emitted %v, want a return to the repo list", c.rights, emitted)
 		}
 	}
 }
 
 func TestFirstReleaseBumpsFromZero(t *testing.T) {
 	m := newTestModel(semver.Format{Prefix: "mypkg/v", Suffix: "-x"}, []string{"v9.9.9"})
-	press(m, downKey)
+	press(m, rightKey)
 	press(m, enterKey)
 
 	if got := pushingToast(t, press(m, yesKey)); got != "pushing mypkg/v0.1.0-x to origin…" {
 		t.Errorf("toast = %q, want the first minor release", got)
+	}
+}
+
+func TestArrowsMoveBetweenFields(t *testing.T) {
+	m := newTestModel(semver.Format{Prefix: "v"}, []string{"v1.2.3"})
+	press(m, rightKey)
+	press(m, downKey)
+	press(m, upKey)
+	press(m, rightKey)
+	press(m, downKey)
+
+	if got := pushingToast(t, press(m, yesKey)); got != "pushing v2.0.0 to origin…" {
+		t.Errorf("toast = %q, want the major bump picked after moving back up", got)
+	}
+}
+
+func TestTabDoesNotMoveBetweenFields(t *testing.T) {
+	m := newTestModel(semver.Format{Prefix: "v"}, []string{"v1.2.3"})
+	press(m, tabKey)
+
+	if emitted := press(m, yesKey); len(emitted) != 0 {
+		t.Errorf("emitted %v after tab, want focus still on the version select", emitted)
 	}
 }
 

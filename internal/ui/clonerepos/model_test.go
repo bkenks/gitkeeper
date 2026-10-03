@@ -62,13 +62,12 @@ func TestPasteFillsNamespaceInput(t *testing.T) {
 func TestViewStartsWithTitleAndFillsHeight(t *testing.T) {
 	m := newSizedModel(t, 80, 30)
 	_, height := sizeBuffer()
-	_, contentHeight := styles.ContentSize(0)
+	_, contentHeight := styles.FullContentSize(0)
 
 	content := m.View().Content
 
-	titleRow := styles.MenuTitle.GetMarginTop()
-	if line := strings.Split(content, "\n")[titleRow]; !strings.Contains(line, "Repository Clone") {
-		t.Errorf("row %d = %q, want the title with no spacer rows above it", titleRow, line)
+	if line := strings.Split(content, "\n")[0]; !strings.Contains(line, "Repository Clone") {
+		t.Errorf("row 0 = %q, want the title with no spacer rows above it", line)
 	}
 	if got := lipgloss.Height(content); got != contentHeight {
 		t.Errorf("view is %d rows, want it to fill the %d-row content area", got, contentHeight)

@@ -169,10 +169,14 @@ func headerView(mode mode) string {
 	if mode == modeNamespace {
 		sub = "clone every repo in a namespace/org"
 	}
+	// The shared MenuTitle and MenuSubStyle carry vertical margins that other
+	// screens use to breathe; this screen gives every row to the textarea, so
+	// it lays the two lines flush instead. Derived per render so a palette
+	// change re-colors them.
 	title := lipgloss.JoinVertical(
 		lipgloss.Left,
-		styles.MenuTitle.Render("Repository Clone"),
-		styles.MenuSubStyle.Render(sub),
+		styles.MenuTitle.Margin(0, 0, 0, 2).Render("Repository Clone"),
+		styles.MenuSubStyle.Margin(0, 0, 0, 2).Render(sub),
 	)
 	return title
 }
@@ -182,14 +186,15 @@ func footerView(mode mode) string {
 	if mode == modeNamespace {
 		binds = append(binds, constants.CloneRepoKeyMap.CycleForge)
 	}
-	helpKeys := styles.MenuHelpStyle.Render(domain.FormatBindingsInline(func() []key.Binding { return binds }))
-	return helpKeys
+	// MenuHelpStyle's top margin separates the help line on other screens;
+	// this screen keeps the footer flush so the textarea gets the row.
+	return styles.MenuHelpStyle.Margin(0, 0, 0, 2).Render(domain.FormatBindingsInline(func() []key.Binding { return binds }))
 }
 
 func sizeBuffer() (w, h int) {
 	headerHeight := lipgloss.Height(headerView(modeURLs))
 	footerHeight := lipgloss.Height(footerView(modeURLs))
-	return styles.ContentSize(headerHeight + footerHeight)
+	return styles.FullContentSize(headerHeight + footerHeight)
 }
 
 func (m *Model) View() tea.View {
@@ -207,7 +212,7 @@ func (m *Model) View() tea.View {
 		footerView(m.mode),
 	)
 
-	_, height := styles.ContentSize(0)
+	_, height := styles.FullContentSize(0)
 	placedContent := lipgloss.PlaceVertical(height, lipgloss.Center, content)
 	return tea.NewView(placedContent)
 }
