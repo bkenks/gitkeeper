@@ -105,36 +105,33 @@ from the remote's latest tag. `mise run check` runs, then the tag is created and
 pushed. A tree that fails its checks never gets tagged. If `git push` of the tag
 fails, the local tag is deleted so a retry starts clean.
 
-**Publishing** — pushing the tag is the whole job. Woodpecker builds the binaries
-and creates the Forgejo release; see [CI](#ci) below. Nothing is built locally, so
-the task finishes in seconds.
+**Publishing** — pushing the tag is the whole job. GitHub Actions builds the
+binaries and creates the GitHub release; see [CI](#ci) below. Nothing is built
+locally, so the task finishes in seconds.
 
 ## CI
 
-`.woodpecker.yml` runs on every push and pull request, and on a pushed `v*` tag.
-Pushes and pull requests run only the first step; a tag runs all three, in order:
+`.github/workflows/ci.yml` runs `mise run check` on every push and pull request.
+`.github/workflows/release.yml` runs on a pushed `v*` tag, in order:
 
-1. **check** — `mise install`, then `mise run check`.
-2. **build** — `mise run build --all --version $CI_COMMIT_TAG`, producing the six
+1. **Build** — `mise run build --all --version $GITHUB_REF_NAME`, producing the six
    binaries plus `SHA256SUMS` in `build/dist/`, then verifies them with
    `sha256sum -c SHA256SUMS`.
-3. **release** — [`woodpeckerci/plugin-release`](https://woodpecker-ci.org/plugins/release)
-   creates the Forgejo release for the tag and attaches everything in `build/dist/`.
+2. **Release** — `gh release create` attaches everything in `build/dist/` to a
+   GitHub release for the tag, using the workflow's `GITHUB_TOKEN`.
 
-The version comes from `$CI_COMMIT_TAG` rather than `git describe`: Woodpecker
+The version comes from `$GITHUB_REF_NAME` rather than `git describe`: Actions
 clones shallowly, so the tag history `describe` needs may not be there. That is
 what `mise run build --version` exists for.
 
-The first two steps run in the `jdxcode/mise` image and provision the toolchain
-from `mise.toml`, so CI compiles with the same Go version as a local build.
-
-**Setup** — the pipeline needs one Woodpecker secret, `forgejo_token`: a Forgejo
-access token with the `write:repository` and `read:misc` scopes. The forge URL is
-taken from Woodpecker's own `$CI_FORGE_URL`, so nothing else is hardcoded.
+Both workflows run on `ubuntu-latest` and provision the toolchain from
+`mise.toml` via `jdx/mise-action`, so CI compiles with the same Go version as a
+local build. No secrets or extra setup are needed — `GITHUB_TOKEN` is provided
+by Actions itself.
 
 gitkeeper is not distributed through Homebrew. Releases ship prebuilt binaries; install
 one from the releases page, with `go install`, or from a clone with `mise run install`.
 
-`go install github.com/bkenks/gitkeeper@latest` resolves through the GitHub mirror, which
-is why release tags keep the `v` prefix: the Go proxy only indexes `vX.Y.Z`. Pushing a
-new tag to the mirror is what makes a release visible there.
+`go install github.com/bkenks/gitkeeper@latest` resolves through the Go proxy, which
+is why release tags keep the `v` prefix: the proxy only indexes `vX.Y.Z`. Pushing a
+new tag is what makes a release visible there.

@@ -19,9 +19,9 @@ tag is created, so a broken tree never gets tagged.
 Tags are `vX.Y.Z`. The prefix is what Go modules require, so it is also what keeps
 `go install github.com/bkenks/gitkeeper@latest` resolving to the newest release.
 
-Pushing the tag is the whole job: Woodpecker (`.woodpecker.yml`) picks up the
-`v*` tag, cross-compiles the release matrix and creates the Forgejo release with
-every binary attached.
+Pushing the tag is the whole job: GitHub Actions (`.github/workflows/release.yml`)
+picks up the `v*` tag, cross-compiles the release matrix and creates the GitHub
+release with every binary attached.
 """
 
 from __future__ import annotations
@@ -186,7 +186,7 @@ def main() -> None:
         raise
 
     print(
-        f"\npushed {new} — Woodpecker is building the matrix and will create the "
+        f"\npushed {new} — GitHub Actions is building the matrix and will create the "
         "release with every binary attached."
     )
 

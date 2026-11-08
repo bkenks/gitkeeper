@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly FORGE_URL="https://fj.ktbcloud.com"
 readonly REPO="bkenks/gitkeeper"
+readonly API_URL="https://api.github.com/repos/${REPO}"
+readonly RELEASES_URL="https://github.com/${REPO}/releases"
 readonly INSTALL_DIR="${HOME}/.local/bin"
 tmp_dir=""
 
@@ -19,7 +20,7 @@ detect_os() {
   case "$(uname -s)" in
   Darwin) echo darwin ;;
   Linux) echo linux ;;
-  *) fail "unsupported OS $(uname -s); download a binary from ${FORGE_URL}/${REPO}/releases" ;;
+  *) fail "unsupported OS $(uname -s); download a binary from ${RELEASES_URL}" ;;
   esac
 }
 
@@ -27,16 +28,16 @@ detect_arch() {
   case "$(uname -m)" in
   x86_64 | amd64) echo amd64 ;;
   arm64 | aarch64) echo arm64 ;;
-  *) fail "unsupported CPU $(uname -m); download a binary from ${FORGE_URL}/${REPO}/releases" ;;
+  *) fail "unsupported CPU $(uname -m); download a binary from ${RELEASES_URL}" ;;
   esac
 }
 
 get_latest_tag() {
   local release_json tag
-  release_json="$(curl -fsSL "${FORGE_URL}/api/v1/repos/${REPO}/releases/latest")" ||
-    fail "couldn't reach ${FORGE_URL} to look up the latest release"
+  release_json="$(curl -fsSL "${API_URL}/releases/latest")" ||
+    fail "couldn't reach GitHub to look up the latest release"
   tag="$(printf '%s' "$release_json" | sed -n 's/.*"tag_name":"\([^"]*\)".*/\1/p')"
-  [ -n "$tag" ] || fail "couldn't read the latest release tag from ${FORGE_URL}"
+  [ -n "$tag" ] || fail "couldn't read the latest release tag from GitHub"
   echo "$tag"
 }
 
@@ -62,7 +63,7 @@ main() {
   arch="$(detect_arch)"
   tag="$(get_latest_tag)"
   artifact="gitkeeper-${tag}-${os}-${arch}"
-  download_url="${FORGE_URL}/${REPO}/releases/download/${tag}"
+  download_url="${RELEASES_URL}/download/${tag}"
 
   tmp_dir="$(mktemp -d)"
   trap 'rm -r "$tmp_dir"' EXIT

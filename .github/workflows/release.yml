@@ -1,0 +1,30 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v3
+      - name: Build the release matrix
+        run: mise run build --all --version "$GITHUB_REF_NAME"
+      - name: Verify checksums
+        run: cd build/dist && sha256sum -c SHA256SUMS
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" build/dist/* \
+            --title "$GITHUB_REF_NAME" \
+            --notes "gitkeeper ${GITHUB_REF_NAME}
+
+          Binaries for darwin, linux and windows on amd64 and arm64, plus
+          SHA256SUMS for \`sha256sum -c\`."

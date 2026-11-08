@@ -39,7 +39,7 @@ It's plain `git` underneath, with no `ghq`. The only requirement is [git](https:
 macOS or Linux:
 
 ```bash
-curl -fsSL https://fj.ktbcloud.com/bkenks/gitkeeper/raw/branch/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/bkenks/gitkeeper/main/install.sh | bash
 ```
 
 It downloads the latest release for your OS and CPU, checks it against `SHA256SUMS`, and puts it
@@ -47,20 +47,19 @@ in `~/.local/bin/gitkeeper`. Run it again to update.
 
 ### mise
 
-gitkeeper isn't in the mise registry, so point mise's `forgejo` backend at the repo:
+gitkeeper isn't in the mise registry, so point mise's `github` backend at the repo:
 
 ```bash
-mise use -g 'forgejo:bkenks/gitkeeper[api_url=https://fj.ktbcloud.com/api/v1,bin=gitkeeper,minimum_release_age=0h]'
+mise use -g 'github:bkenks/gitkeeper[bin=gitkeeper,minimum_release_age=0h]'
 ```
 
 Or in a `mise.toml`:
 
 ```toml
 [tools]
-"forgejo:bkenks/gitkeeper" = { version = "latest", api_url = "https://fj.ktbcloud.com/api/v1", bin = "gitkeeper", minimum_release_age = "0h" }
+"github:bkenks/gitkeeper" = { version = "latest", bin = "gitkeeper", minimum_release_age = "0h" }
 ```
 
-- `api_url` points mise at my Forgejo instance.
 - `bin` installs the release binary as `gitkeeper`.
 - `minimum_release_age = "0h"` gets you a new release as soon as it's out, even if your mise
   settings hold new releases back for a while.
@@ -69,7 +68,7 @@ Update it with `mise upgrade`.
 
 ### Prebuilt binary
 
-Every [release](https://fj.ktbcloud.com/bkenks/gitkeeper/releases) has binaries for macOS, Linux
+Every [release](https://github.com/bkenks/gitkeeper/releases) has binaries for macOS, Linux
 and Windows on amd64 and arm64, plus a `SHA256SUMS` file. This is the way to go on Windows.
 
 ```bash
@@ -84,13 +83,13 @@ mv gitkeeper-*-darwin-arm64 ~/.local/bin/gitkeeper
 go install github.com/bkenks/gitkeeper@latest
 ```
 
-This installs to `$GOBIN` (or `$(go env GOPATH)/bin`). It goes through the GitHub mirror, so it
-can lag a release, and `gitkeeper --version` prints `dev`.
+This installs to `$GOBIN` (or `$(go env GOPATH)/bin`). It's built from source rather than a
+release binary, so `gitkeeper --version` prints `dev`.
 
 ### From source
 
 ```bash
-git clone https://fj.ktbcloud.com/bkenks/gitkeeper.git
+git clone https://github.com/bkenks/gitkeeper.git
 cd gitkeeper
 mise run install
 ```
