@@ -21,20 +21,19 @@ func RepoDir(baseDir, key string) string {
 }
 
 // RenderGitConfig makes a repo's git config match its RepoLink: origin points
-// at the placeholder host, a single local insteadOf rewrites the placeholder to
-// the origin forge (so fetch/pull go there), and one remote.origin.pushurl is
-// written per upstream forge, which makes a push fan out to all of them. It's
-// idempotent — stale gitkeeper-managed insteadOf rules and every existing pushurl
-// are cleared first — so it can be re-run whenever the links or scheme change.
-// The origin forge is looked up before anything is changed, so a missing forge
-// leaves the repo's existing config working.
+// at the placeholder host and a single local insteadOf rewrites the
+// placeholder to the repo's forge, so fetch, pull and push all go there. It's
+// idempotent — stale gitkeeper-managed insteadOf rules and any
+// remote.origin.pushurl are cleared first — so it can be re-run whenever the
+// forge or scheme changes. The forge is looked up before anything is changed,
+// so a missing forge leaves the repo's existing config working.
 func RenderGitConfig(cfg config.Config, key string, link config.RepoLink) error {
 	dir := RepoDir(cfg.RepoRoot(), key)
 	scheme := config.NormalizeScheme(link.Scheme)
 
-	origin, ok := cfg.ForgeByName(link.Origin)
+	forge, ok := cfg.ForgeByName(link.Forge)
 	if !ok {
-		return fmt.Errorf("origin forge %q not in registry", link.Origin)
+		return fmt.Errorf("forge %q not in registry", link.Forge)
 	}
 
 	if err := clearManagedInsteadOf(dir, cfg.PlaceholderHost); err != nil {
@@ -42,10 +41,10 @@ func RenderGitConfig(cfg config.Config, key string, link config.RepoLink) error 
 	}
 
 	phBase := hostBase(scheme, cfg.PlaceholderHost)
-	originBase := hostBase(scheme, origin.Host)
+	forgeBase := hostBase(scheme, forge.Host)
 
-	// url.<originBase>.insteadOf = <placeholderBase>
-	insteadOfKey := "url." + originBase + ".insteadOf"
+	// url.<forgeBase>.insteadOf = <placeholderBase>
+	insteadOfKey := "url." + forgeBase + ".insteadOf"
 	if _, err := runGit(dir, "config", "--local", insteadOfKey, phBase); err != nil {
 		return err
 	}
@@ -54,36 +53,13 @@ func RenderGitConfig(cfg config.Config, key string, link config.RepoLink) error 
 	if _, err := runGit(dir, "config", "--local", "remote.origin.url", placeholderURL); err != nil {
 		return err
 	}
-	return renderPushURLs(cfg, dir, key, scheme, link)
-}
-
-// renderPushURLs replaces remote.origin.pushurl with one concrete URL per
-// upstream forge. Upstreams that aren't in the registry are skipped. With a
-// single upstream (the origin forge) no pushurl is written at all, so push
-// follows the placeholder origin like it always has.
-func renderPushURLs(cfg config.Config, dir, key, scheme string, link config.RepoLink) error {
-	if err := unsetAll(dir, "remote.origin.pushurl"); err != nil {
-		return err
-	}
-	if len(link.Upstreams) < 2 {
-		return nil
-	}
-	for _, name := range link.Upstreams {
-		forge, ok := cfg.ForgeByName(name)
-		if !ok {
-			continue
-		}
-		pushURL := RemoteURL(scheme, forge.Host, key)
-		_, err := runGit(dir, "config", "--local", "--add", "remote.origin.pushurl", pushURL)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
+	// Push URLs were written per forge when a repo could have several; drop
+	// any left over so push follows the placeholder origin.
+	return unsetAll(dir, "remote.origin.pushurl")
 }
 
 // clearManagedInsteadOf removes every url.<base>.insteadOf whose value is our
-// placeholder prefix (for either scheme), so switching the origin forge never
+// placeholder prefix (for either scheme), so switching the forge never
 // leaves two rules competing for the same placeholder prefix.
 func clearManagedInsteadOf(dir, placeholderHost string) error {
 	managed := []string{
@@ -185,8 +161,7 @@ func List(cfg config.Config) ([]domain.Repo, error) {
 			Path:             key,
 			AbsPath:          path,
 			LastInteracted:   interactions[key],
-			Upstreams:        link.Upstreams,
-			Origin:           link.Origin,
+			Forge:            link.Forge,
 			Scheme:           link.Scheme,
 			LocalBranches:    stats.branches,
 			UnpushedCommits:  stats.unpushed,

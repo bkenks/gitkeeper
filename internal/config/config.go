@@ -1,6 +1,7 @@
 package config
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,8 +15,8 @@ import (
 )
 
 // DefaultPlaceholderHost is the fake host stored in every managed repo's
-// origin. A per-repo local git `insteadOf` rule rewrites it to the origin
-// forge, so the stored remote never changes when the origin forge does.
+// origin. A per-repo local git `insteadOf` rule rewrites it to the repo's
+// forge, so the stored remote never changes when the forge does.
 const DefaultPlaceholderHost = "gitkeeper-placeholder"
 
 // DefaultSortMode is the repo list ordering used when none is stored. It
@@ -78,89 +79,31 @@ type Forge struct {
 	Host string `json:"host"`
 }
 
-// RepoLink records which forges host a managed repo. Upstreams are every forge
-// the repo is pushed to; Origin is the single one the placeholder insteadOf
-// rewrite resolves to, making it the fetch/pull URL. Origin is always one of
-// Upstreams. Scheme is the URL scheme used for that repo. TagPrefix and
+// RepoLink records which forge hosts a managed repo. Forge is the registry
+// forge the placeholder insteadOf rewrite resolves to, so fetch, pull and push
+// all go there. Scheme is the URL scheme used for that repo. TagPrefix and
 // TagSuffix wrap the version in the repo's release tags.
 type RepoLink struct {
-	Upstreams []string `json:"upstreams"`
-	Origin    string   `json:"origin"`
-	Scheme    string   `json:"scheme"`
+	Forge  string `json:"forge,omitempty"`
+	Scheme string `json:"scheme"`
 
 	TagPrefix string `json:"tagPrefix,omitempty"`
 	TagSuffix string `json:"tagSuffix,omitempty"`
 
-	// LegacyForges and LegacyPrimary hold the pre-upstream schema. normalize
-	// folds them into Upstreams/Origin and clears them, so they disappear from
-	// the file on the next Save.
-	LegacyForges  []string `json:"forges,omitempty"`
-	LegacyPrimary string   `json:"primary,omitempty"`
+	// The Legacy fields hold older multi-forge schemas: upstreams/origin, and
+	// before that forges/primary. migrateRepoLink folds them into Forge and
+	// clears them, so they disappear from the file on the next Save.
+	LegacyUpstreams []string `json:"upstreams,omitempty"`
+	LegacyOrigin    string   `json:"origin,omitempty"`
+	LegacyForges    []string `json:"forges,omitempty"`
+	LegacyPrimary   string   `json:"primary,omitempty"`
 }
 
 // Clone returns a copy of the link that shares no slices with the original.
 func (l RepoLink) Clone() RepoLink {
-	l.Upstreams = slices.Clone(l.Upstreams)
+	l.LegacyUpstreams = slices.Clone(l.LegacyUpstreams)
 	l.LegacyForges = slices.Clone(l.LegacyForges)
 	return l
-}
-
-// HasUpstream reports whether name is one of the forges the repo is pushed to.
-func (l RepoLink) HasUpstream(name string) bool {
-	return slices.Contains(l.Upstreams, name)
-}
-
-// ToggleUpstream adds name as an upstream, or removes it if it already is one.
-// The first upstream added becomes the origin.
-func (l *RepoLink) ToggleUpstream(name string) {
-	if l.HasUpstream(name) {
-		l.RemoveUpstream(name)
-		return
-	}
-	l.Upstreams = append(slices.Clip(l.Upstreams), name)
-	if l.Origin == "" {
-		l.Origin = name
-	}
-}
-
-// RemoveUpstream drops name from the upstreams. When it was the origin, the
-// first remaining upstream takes over, or the origin is cleared if none remain.
-func (l *RepoLink) RemoveUpstream(name string) {
-	isRemoved := func(upstream string) bool { return upstream == name }
-	l.Upstreams = slices.DeleteFunc(slices.Clone(l.Upstreams), isRemoved)
-	if l.Origin == name {
-		l.Origin = ""
-		if len(l.Upstreams) > 0 {
-			l.Origin = l.Upstreams[0]
-		}
-	}
-}
-
-// SetOrigin makes name the forge the repo is fetched from, adding it to the
-// upstreams if it isn't one already.
-func (l *RepoLink) SetOrigin(name string) {
-	if !l.HasUpstream(name) {
-		l.Upstreams = append(slices.Clip(l.Upstreams), name)
-	}
-	l.Origin = name
-}
-
-// RenameUpstream rewrites forge oldName to newName in the upstreams and origin,
-// dropping the duplicate if the repo already linked newName.
-func (l *RepoLink) RenameUpstream(oldName, newName string) {
-	renamed := make([]string, 0, len(l.Upstreams))
-	for _, u := range l.Upstreams {
-		if u == oldName {
-			u = newName
-		}
-		if !slices.Contains(renamed, u) {
-			renamed = append(renamed, u)
-		}
-	}
-	l.Upstreams = renamed
-	if l.Origin == oldName {
-		l.Origin = newName
-	}
 }
 
 // ToggleScheme switches the link between https and ssh.
@@ -172,18 +115,17 @@ func (l *RepoLink) ToggleScheme() {
 	}
 }
 
-// WithForgeLinks returns l with Upstreams, Origin and Scheme taken from src,
-// keeping l's tag format.
-func (l RepoLink) WithForgeLinks(src RepoLink) RepoLink {
-	l.Upstreams = slices.Clone(src.Upstreams)
-	l.Origin = src.Origin
+// WithForgeLink returns l with Forge and Scheme taken from src, keeping l's
+// tag format.
+func (l RepoLink) WithForgeLink(src RepoLink) RepoLink {
+	l.Forge = src.Forge
 	l.Scheme = src.Scheme
 	return l
 }
 
-// IsEmpty reports whether the link records neither forges nor a tag format.
+// IsEmpty reports whether the link records neither a forge nor a tag format.
 func (l RepoLink) IsEmpty() bool {
-	return len(l.Upstreams) == 0 && l.Origin == "" && l.TagPrefix == "" && l.TagSuffix == ""
+	return l.Forge == "" && l.TagPrefix == "" && l.TagSuffix == ""
 }
 
 // NormalizeScheme maps any scheme string to SchemeSSH or SchemeHTTPS.
@@ -217,7 +159,7 @@ type Config struct {
 
 	Forges   []Forge   `json:"forges"`
 	Keybinds []Keybind `json:"keybinds"`
-	// Repos maps a repo key ("<namespace>/<repo>") to its forge links.
+	// Repos maps a repo key ("<namespace>/<repo>") to its forge link.
 	Repos map[string]RepoLink `json:"repos"`
 
 	// LoadFailed is set when the config file exists but couldn't be read or
@@ -456,18 +398,26 @@ func normalizeDir(dir string) string {
 	return filepath.Clean(dir)
 }
 
-// migrateRepoLink folds the pre-upstream forges/primary fields of a repo link
-// into Upstreams/Origin, leaving an already-migrated link untouched.
+// migrateRepoLink folds the multi-forge fields of an older repo link into
+// Forge, keeping the forge it was fetched from (origin, else primary, else its
+// first listed forge). An already-migrated link is left untouched.
 func migrateRepoLink(link RepoLink) RepoLink {
-	if len(link.Upstreams) == 0 {
-		link.Upstreams = link.LegacyForges
+	if link.Forge == "" {
+		link.Forge = cmp.Or(link.LegacyOrigin, link.LegacyPrimary,
+			firstOf(link.LegacyUpstreams), firstOf(link.LegacyForges))
 	}
-	if link.Origin == "" {
-		link.Origin = link.LegacyPrimary
-	}
+	link.LegacyUpstreams = nil
+	link.LegacyOrigin = ""
 	link.LegacyForges = nil
 	link.LegacyPrimary = ""
 	return link
+}
+
+func firstOf(names []string) string {
+	if len(names) == 0 {
+		return ""
+	}
+	return names[0]
 }
 
 // Save serializes cfg to Path() as indented JSON, creating parents as needed.

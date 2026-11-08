@@ -1,8 +1,7 @@
-// Package forgeselect is the clone-time screen where the user picks which
-// forges each repo being cloned is pushed to, and which single one it is
-// fetched from (the origin). It seeds the
-// selection from an auto-match on the clone URL's host and lets the user add a
-// new forge inline from that URL.
+// Package forgeselect is the clone-time screen where the user picks the forge
+// each repo being cloned is linked to. It seeds the selection from an
+// auto-match on the clone URL's host and lets the user add a new forge inline
+// from that URL.
 package forgeselect
 
 import (
@@ -26,20 +25,18 @@ import (
 )
 
 type keyMap struct {
-	Toggle, Origin, Scheme, Add, Confirm, Exit key.Binding
+	Scheme, Add, Confirm, Exit key.Binding
 }
 
 var keys = keyMap{
-	Toggle:  key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "upstream")),
-	Origin:  key.NewBinding(key.WithKeys("o"), key.WithHelp("o", "origin")),
 	Scheme:  key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "scheme")),
 	Add:     key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add forge")),
-	Confirm: key.NewBinding(key.WithKeys("enter", "ctrl+p"), key.WithHelp("enter", "next")),
+	Confirm: key.NewBinding(key.WithKeys("enter", "ctrl+p"), key.WithHelp("enter", "use forge")),
 	Exit:    key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancel")),
 }
 
 func helpKeys() []key.Binding {
-	return []key.Binding{keys.Toggle, keys.Origin, keys.Scheme, keys.Add, keys.Confirm, keys.Exit}
+	return []key.Binding{keys.Confirm, keys.Scheme, keys.Add, keys.Exit}
 }
 
 type Model struct {
@@ -73,7 +70,7 @@ func New(cfg config.Config, pending []repomgr.PendingClone) *Model {
 
 	m := &Model{forges: forges, pending: pending, nameInput: ti, list: l}
 	m.refresh()
-	m.selectOrigin()
+	m.selectCurrent()
 	return m
 }
 
@@ -89,14 +86,15 @@ func (m *Model) refresh() {
 	}
 	p := m.cur()
 	idx := m.list.Index()
-	m.list.SetItems(forgepick.Items(m.forges, p.RepoLink))
+	m.list.SetItems(forgepick.Items(m.forges, p.Forge))
 	m.list.Select(idx)
-	m.list.Title = fmt.Sprintf("Link Forges · repo %d/%d · %s · %s",
+	m.list.Title = fmt.Sprintf("Link Forge · repo %d/%d · %s · %s",
 		m.idx+1, len(m.pending), p.URL.Key(), config.NormalizeScheme(p.Scheme))
 }
 
-func (m *Model) selectOrigin() {
-	if i := forgepick.IndexOf(m.forges, m.cur().Origin); i >= 0 {
+// selectCurrent moves the cursor to the current repo's chosen forge.
+func (m *Model) selectCurrent() {
+	if i := forgepick.IndexOf(m.forges, m.cur().Forge); i >= 0 {
 		m.list.Select(i)
 	}
 }
@@ -126,14 +124,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case key.Matches(km, keys.Exit):
 		return m, commands.SetState(domain.StateMain)
-	case key.Matches(km, keys.Toggle):
-		m.toggleSelected()
-		m.refresh()
-		return m, nil
-	case key.Matches(km, keys.Origin):
-		m.setOriginSelected()
-		m.refresh()
-		return m, nil
 	case key.Matches(km, keys.Scheme):
 		m.cur().ToggleScheme()
 		m.refresh()
@@ -157,36 +147,29 @@ func (m *Model) selectedForge() (config.Forge, bool) {
 	return m.forges[i], true
 }
 
-func (m *Model) toggleSelected() {
+// useSelected links the current repo to the highlighted forge.
+func (m *Model) useSelected() {
 	f, ok := m.selectedForge()
 	if !ok {
 		return
 	}
-	m.cur().ToggleUpstream(f.Name)
+	m.cur().Forge = f.Name
 	m.err = ""
 }
 
-// setOriginSelected makes the highlighted forge the single fetch source for the
-// current repo, adding it to the upstreams if it wasn't already one.
-func (m *Model) setOriginSelected() {
-	f, ok := m.selectedForge()
-	if !ok {
-		return
-	}
-	m.cur().SetOrigin(f.Name)
-	m.err = ""
-}
-
+// confirm links the current repo to the highlighted forge and moves on to the
+// next repo, or finishes once every repo has one.
 func (m *Model) confirm() (tea.Model, tea.Cmd) {
-	if m.cur().Origin == "" {
-		m.err = "pick an origin forge (o) before continuing"
+	m.useSelected()
+	if m.cur().Forge == "" {
+		m.err = "add a forge (a) before continuing"
 		return m, nil
 	}
 	if m.idx < len(m.pending)-1 {
 		m.idx++
 		m.err = ""
 		m.refresh()
-		m.selectOrigin()
+		m.selectCurrent()
 		return m, nil
 	}
 	clones := m.pending
@@ -203,7 +186,7 @@ func (m *Model) startAdd() (tea.Model, tea.Cmd) {
 	for i, f := range m.forges {
 		if strings.EqualFold(f.Host, host) {
 			m.list.Select(i)
-			m.setOriginSelected()
+			m.useSelected()
 			m.refresh()
 			return m, nil
 		}
@@ -241,7 +224,7 @@ func (m *Model) updateAdding(km tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.nameInput.Blur()
 		m.refresh()
 		m.list.Select(len(m.forges) - 1)
-		m.setOriginSelected()
+		m.useSelected()
 		m.refresh()
 		return m, nil
 	}

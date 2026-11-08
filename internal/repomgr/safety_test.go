@@ -31,7 +31,7 @@ func TestParseRepoURLRejectsUnsafePaths(t *testing.T) {
 	}
 }
 
-func TestRenderGitConfigLeavesRepoAloneWhenOriginIsMissing(t *testing.T) {
+func TestRenderGitConfigLeavesRepoAloneWhenForgeIsMissing(t *testing.T) {
 	base := t.TempDir()
 	dir := initRepo(t, base, "me/demo")
 	cfg := config.Config{
@@ -39,15 +39,15 @@ func TestRenderGitConfigLeavesRepoAloneWhenOriginIsMissing(t *testing.T) {
 		PlaceholderHost: config.DefaultPlaceholderHost,
 		Forges:          []config.Forge{{Name: "github", Host: "github.com"}},
 	}
-	link := config.RepoLink{Upstreams: []string{"github"}, Origin: "github"}
+	link := config.RepoLink{Forge: "github"}
 	if err := RenderGitConfig(cfg, "me/demo", link); err != nil {
 		t.Fatal(err)
 	}
 
-	missing := config.RepoLink{Upstreams: []string{"gone"}, Origin: "gone"}
+	missing := config.RepoLink{Forge: "gone"}
 	err := RenderGitConfig(cfg, "me/demo", missing)
 	if err == nil {
-		t.Fatal("expected an error for an origin forge missing from the registry")
+		t.Fatal("expected an error for a forge missing from the registry")
 	}
 	got := gitCfg(t, dir, "url.https://github.com/.insteadOf")
 	if got != "https://gitkeeper-placeholder/" {
@@ -66,7 +66,7 @@ func TestRenderGitConfigKeepsUnrelatedInsteadOfRules(t *testing.T) {
 		Forges:          []config.Forge{{Name: "github", Host: "github.com"}},
 	}
 
-	link := config.RepoLink{Upstreams: []string{"github"}, Origin: "github"}
+	link := config.RepoLink{Forge: "github"}
 	if err := RenderGitConfig(cfg, "me/demo", link); err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestRenderGitConfigReportsGitFailures(t *testing.T) {
 		PlaceholderHost: config.DefaultPlaceholderHost,
 		Forges:          []config.Forge{{Name: "github", Host: "github.com"}},
 	}
-	link := config.RepoLink{Upstreams: []string{"github"}, Origin: "github"}
+	link := config.RepoLink{Forge: "github"}
 	err := RenderGitConfig(cfg, "me/missing", link)
 	if err == nil {
 		t.Fatal("expected an error for a repo directory that doesn't exist")

@@ -1,0 +1,8 @@
+{
+    "go.alternateTools": {
+        "go": "/Users/briankenkel/.local/share/mise/shims/go"
+    },
+    "debug.javascript.defaultRuntimeExecutable": {
+        "pwa-node": "/Users/briankenkel/.local/share/mise/shims/node"
+    }
+}

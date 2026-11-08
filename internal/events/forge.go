@@ -6,7 +6,7 @@ import (
 )
 
 // ForgeSelectComplete is emitted by the clone-time forge-select screen once the
-// user has chosen forge links for every pending repo. NewForges carries any
+// user has chosen a forge for every pending repo. NewForges carries any
 // forges added inline (via "add forge from URL") so they get persisted.
 type ForgeSelectComplete struct {
 	Clones    []repomgr.PendingClone
@@ -17,9 +17,8 @@ func (ForgeSelectComplete) isEvent() {}
 
 // ForgesChanged replaces the whole forge registry (from the settings screen).
 // Repos carries the repo links already reconciled against the new registry —
-// forges removed or renamed there are cascaded into each repo's
-// Upstreams/Origin so no repo is left referencing a forge that no longer
-// exists.
+// forges removed or renamed there are cascaded into each repo's Forge so no
+// repo is left referencing a forge that no longer exists.
 type ForgesChanged struct {
 	Forges []config.Forge
 	Repos  map[string]config.RepoLink
@@ -27,8 +26,8 @@ type ForgesChanged struct {
 
 func (ForgesChanged) isEvent() {}
 
-// RepoSettingsChanged saves one repo's settings — its forge links
-// (upstreams/origin/scheme) and tag format — and re-renders its git config.
+// RepoSettingsChanged saves one repo's settings — its forge, scheme and tag
+// format — and re-renders its git config.
 type RepoSettingsChanged struct {
 	Key  string
 	Link config.RepoLink

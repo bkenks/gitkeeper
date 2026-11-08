@@ -3,7 +3,6 @@ package domain
 import (
 	"fmt"
 	"path"
-	"strings"
 	"time"
 )
 
@@ -18,12 +17,9 @@ type Repo struct {
 	AbsPath        string
 	LastInteracted time.Time
 
-	// Forge links, populated from config for repos under the gitkeeper base dir.
-	// Upstreams are every forge the repo is pushed to; Origin is the one it is
-	// fetched from.
-	Upstreams []string
-	Origin    string
-	Scheme    string
+	// Forge link, populated from config for repos under the gitkeeper base dir.
+	Forge  string
+	Scheme string
 
 	// Local git state, used to gauge whether a repo can be wiped safely. These
 	// are independent signals: LocalBranches counts refs/heads; UnpushedCommits
@@ -74,12 +70,8 @@ func (r Repo) Description() string {
 		}
 		line += stats
 	}
-	if ShowForge && r.Origin != "" {
-		forges := "origin: " + r.Origin
-		if len(r.Upstreams) > 1 {
-			forges += "  ·  push: " + strings.Join(r.Upstreams, ", ")
-		}
-		return line + "\n" + forges
+	if ShowForge && r.Forge != "" {
+		return line + "\n" + "forge: " + r.Forge
 	}
 	return line
 }

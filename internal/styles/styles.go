@@ -134,15 +134,13 @@ func newHelpModel() help.Model {
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Selection-list helpers
 //
-// Glyphs for the checkbox/selection screens (forge select, forge registry,
-// repo forges) — encoded in each list item's title so the bubbles default
+// Glyphs for the selection screens (forge select) — encoded in each list item's title so the bubbles default
 // delegate handles the row/selection styling. Subtle renders the small
 // muted labels those screens draw beneath their lists.
 
 const (
 	GlyphCheckOn  = "◉"
 	GlyphCheckOff = "○"
-	GlyphOrigin   = "★"
 )
 
 // Subtle renders muted secondary text (input labels, hints). It's a function

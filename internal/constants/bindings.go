@@ -148,7 +148,7 @@ func (k repoListKeyMap) Commands() []RepoListCommand {
 	return []RepoListCommand{
 		{k.Settings, "settings", "open settings", true},
 		{k.Keybinds, "keybinds", "manage custom keybinds", true},
-		{k.RepoConfig, "repo settings", "edit repo's forge links & tag format", true},
+		{k.RepoConfig, "repo settings", "edit repo's forge & tag format", true},
 		{k.Shell, "shell", "shell in repo dir", false},
 		{k.CopyPath, "copy", "copy path", false},
 		{k.Refresh, "refresh", "refresh list", false},

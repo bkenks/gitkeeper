@@ -1,9 +1,8 @@
 // Package reposettings is the per-repo settings screen: the prefix and suffix
-// its version tags wrap around MAJOR.MINOR.PATCH, which forges it is pushed to
-// (upstreams), which one it is fetched from (the origin), and the URL scheme.
-// Submitting the form, or ctrl+s from any field, saves it and re-renders the
-// repo's placeholder origin, insteadOf rule and push URLs; esc leaves without
-// saving.
+// its version tags wrap around MAJOR.MINOR.PATCH, the forge it is linked to,
+// and the URL scheme. Submitting the form, or ctrl+s from any field, saves it
+// and re-renders the repo's placeholder origin and insteadOf rule; esc leaves
+// without saving.
 package reposettings
 
 import (
@@ -64,37 +63,33 @@ func New(cfg config.Config, repoKey string, tags []string, tagsErr error) *Model
 	return m
 }
 
-// forgeFields edit the repo's upstreams, origin and scheme, or explain how to
-// add a forge when the registry is empty.
+// forgeFields edit the repo's forge and scheme, or explain how to add a forge
+// when the registry is empty.
 func (m *Model) forgeFields(forges []config.Forge) []huh.Field {
 	if len(forges) == 0 {
-		return []huh.Field{huh.NewNote().Title("Forges").
+		return []huh.Field{huh.NewNote().Title("Forge").
 			Description("No forges registered. Press F on the repo list to add one.")}
 	}
-	upstreams := make([]huh.Option[string], len(forges))
-	for i, forge := range forges {
-		upstreams[i] = huh.NewOption(forge.Name+" ("+forge.Host+")", forge.Name)
+	options := make([]huh.Option[string], 0, len(forges)+2)
+	for _, forge := range forges {
+		options = append(options, huh.NewOption(forge.Name+" ("+forge.Host+")", forge.Name))
 	}
-	const upstreamsHeaderRows = 2
+	// Keep a forge missing from the registry selectable, so opening the screen
+	// doesn't silently relink the repo.
+	if m.link.Forge != "" && !slices.ContainsFunc(forges, func(f config.Forge) bool {
+		return f.Name == m.link.Forge
+	}) {
+		options = append(options, huh.NewOption(m.link.Forge+" (not in registry)", m.link.Forge))
+	}
+	options = append(options, huh.NewOption("none", ""))
 	return []huh.Field{
-		huh.NewMultiSelect[string]().Title("Upstreams").
-			Description("Every forge a push goes to.").
-			Options(upstreams...).Filterable(false).Value(&m.link.Upstreams).
-			Height(upstreamsHeaderRows + len(upstreams)),
-		huh.NewSelect[string]().Title("Origin").
-			Description("The upstream fetch and pull read from.").
-			OptionsFunc(m.originOptions, &m.link.Upstreams).Value(&m.link.Origin),
+		huh.NewSelect[string]().Title("Forge").Inline(true).
+			Description("Where fetch, pull and push go.").
+			Options(options...).Value(&m.link.Forge),
 		huh.NewSelect[string]().Title("Scheme").Inline(true).
 			Options(huh.NewOptions(config.SchemeHTTPS, config.SchemeSSH)...).
 			Value(&m.link.Scheme),
 	}
-}
-
-func (m *Model) originOptions() []huh.Option[string] {
-	if len(m.link.Upstreams) == 0 {
-		return []huh.Option[string]{huh.NewOption("none, pick an upstream first", "")}
-	}
-	return huh.NewOptions(m.link.Upstreams...)
 }
 
 // describeTags previews the tags the current prefix and suffix produce,
@@ -155,18 +150,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// edited is the link as the form left it, with the tag format trimmed and the
-// origin kept to one of the upstreams.
+// edited is the link as the form left it, with the tag format trimmed.
 func (m *Model) edited() config.RepoLink {
 	link := m.link.Clone()
 	format := tagFormat(link)
 	link.TagPrefix, link.TagSuffix = format.Prefix, format.Suffix
-	if !slices.Contains(link.Upstreams, link.Origin) {
-		link.Origin = ""
-		if len(link.Upstreams) > 0 {
-			link.Origin = link.Upstreams[0]
-		}
-	}
 	return link
 }
 

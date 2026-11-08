@@ -115,8 +115,11 @@ func TestRenderGitConfig(t *testing.T) {
 		},
 	}
 
-	// Origin = forgejo, pushed to both forges, https.
-	link := config.RepoLink{Upstreams: []string{"github", "forgejo"}, Origin: "forgejo", Scheme: "https"}
+	// A push URL left over from a multi-forge link is cleared on render.
+	mustGitConfig(t, dir, "--add", "remote.origin.pushurl", "https://github.com/bkenks/gitkeeper.git")
+
+	// Forge = forgejo, https.
+	link := config.RepoLink{Forge: "forgejo", Scheme: "https"}
 	if err := RenderGitConfig(cfg, key, link); err != nil {
 		t.Fatal(err)
 	}
@@ -126,17 +129,12 @@ func TestRenderGitConfig(t *testing.T) {
 	if got := gitCfg(t, dir, "url.https://fj.homektb.com/.insteadOf"); got != "https://gitkeeper-placeholder/" {
 		t.Errorf("forgejo insteadOf = %q", got)
 	}
-
-	// Both upstreams get a push URL, so a push fans out to each forge.
-	if got := gitCfgAll(t, dir, "remote.origin.pushurl"); !equalStrings(got, []string{
-		"https://github.com/bkenks/gitkeeper.git",
-		"https://fj.homektb.com/bkenks/gitkeeper.git",
-	}) {
-		t.Errorf("push URLs = %q", got)
+	if got := gitCfgAll(t, dir, "remote.origin.pushurl"); len(got) != 0 {
+		t.Errorf("push URLs = %q, want none", got)
 	}
 
-	// Switch origin to github: the forgejo rule must be gone, github rule set.
-	link.Origin = "github"
+	// Switch forge to github: the forgejo rule must be gone, github rule set.
+	link.Forge = "github"
 	if err := RenderGitConfig(cfg, key, link); err != nil {
 		t.Fatal(err)
 	}
@@ -161,32 +159,12 @@ func TestRenderGitConfig(t *testing.T) {
 	if got := gitCfg(t, dir, "url.https://github.com/.insteadOf"); got != "" {
 		t.Errorf("stale https insteadOf still present: %q", got)
 	}
-	if got := gitCfgAll(t, dir, "remote.origin.pushurl"); !equalStrings(got, []string{
-		"git@github.com:bkenks/gitkeeper.git",
-		"git@fj.homektb.com:bkenks/gitkeeper.git",
-	}) {
-		t.Errorf("ssh push URLs = %q", got)
-	}
-
-	// Dropping back to a single upstream removes the push URLs entirely, so
-	// push follows the placeholder origin.
-	link.Upstreams = []string{"github"}
-	if err := RenderGitConfig(cfg, key, link); err != nil {
-		t.Fatal(err)
-	}
-	if got := gitCfgAll(t, dir, "remote.origin.pushurl"); len(got) != 0 {
-		t.Errorf("push URLs = %q, want none", got)
-	}
 }
 
-func equalStrings(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
+func mustGitConfig(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := append([]string{"-C", dir, "config", "--local"}, args...)
+	if out, err := exec.Command("git", cmd...).CombinedOutput(); err != nil {
+		t.Fatalf("git config: %s", out)
 	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }

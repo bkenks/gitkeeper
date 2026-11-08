@@ -128,7 +128,7 @@ The first launch writes `~/.config/gitkeeper/config.json` and asks where your re
 | `d` | **Delete** the repo |
 | `1` | **Settings** |
 | `2` | **Custom keybinds** |
-| `3` | **Repo settings**: tag format, upstreams, origin, scheme |
+| `3` | **Repo settings**: tag format, forge, scheme |
 | `Esc` | Clear the filter. `Esc` is back on every screen and never quits |
 | `q` / `Ctrl+C` | Quit |
 
@@ -136,45 +136,36 @@ Letters do things, numbers open settings screens. The sort you pick is saved.
 
 ## Forges and the placeholder remote
 
-gitkeeper is built for repos that live on more than one host, like a self-hosted Forgejo that
-mirrors to GitHub.
-
 - Register each forge once, a name and a host (`github` → `github.com`), with `F`.
-- Each repo has **upstreams**, every forge a push goes to, and one **origin**, the upstream fetch
-  and pull read from. Cloning matches the URL's host to a forge for you.
+- Each repo is linked to one **forge**, where fetch, pull and push go. Cloning matches the URL's
+  host to a forge for you.
 - Every repo's `origin` URL points at a fake host, `gitkeeper-placeholder`. A local git
   [`insteadOf`](https://git-scm.com/docs/git-config#Documentation/git-config.txt-urlltbasegtinsteadOf)
-  rule sends it to the origin forge, and each upstream gets a `pushurl`, so one `git push` hits
-  all of them:
+  rule sends it to the repo's forge:
 
   ```ini
   [remote "origin"]
       url = https://gitkeeper-placeholder/bkenks/myrepo.git    # never changes
-      pushurl = https://github.com/bkenks/myrepo.git         # upstream
-      pushurl = https://fj.example.com/bkenks/myrepo.git     # upstream
   [url "https://github.com/"]
-      insteadOf = https://gitkeeper-placeholder/               # origin = github
+      insteadOf = https://gitkeeper-placeholder/               # forge = github
   ```
 
-- Forge down? Switch the origin in repo settings (`3`). Only the `insteadOf` rule changes; the
-  stored URL never does. There's no automatic failover.
-- A repo with one upstream gets no `pushurl`, so push just follows `origin`.
+- Moving a repo to another forge? Switch it in repo settings (`3`). Only the `insteadOf` rule
+  changes; the stored URL never does.
 
 ## Screens
 
 ### Clone
 
 Paste one or more URLs, or press `Ctrl+T` to clone every repo in a namespace on one forge (`Tab`
-picks the forge). `Ctrl+P` goes, `Esc` backs out. Then gitkeeper walks you through each repo's
-forges:
+picks the forge). `Ctrl+P` goes, `Esc` backs out. Then gitkeeper asks for each repo's forge,
+starting on the one matching its URL:
 
 | Key | Action |
 |---|---|
-| `Space` | Toggle the forge as an **upstream** |
-| `o` | Make the forge the **origin** |
+| `Enter` | Use the highlighted forge and go to the next repo |
 | `s` | Switch the **scheme** (https / ssh) |
 | `a` | **Add a forge** from the repo's URL |
-| `Enter` | Next repo |
 | `Esc` | Cancel the whole clone |
 
 ### Forge registry (`F`)
@@ -188,8 +179,8 @@ forges:
 | `Esc` | Save and go back |
 
 Each row shows how many repos use the forge. Renaming a forge updates those repos. Deleting one
-drops it from them and promotes another upstream to origin if needed. gitkeeper re-renders their
-remotes either way.
+unlinks them, leaving their existing remotes in place. Editing a host re-renders the remotes of
+the repos on it.
 
 ### Repo settings (`3`)
 
@@ -198,8 +189,7 @@ One form for the selected repo:
 - **Tag prefix** and **Tag suffix**: what goes around `MAJOR.MINOR.PATCH` in its release tags.
   `v` gives `v1.2.3`, `mypkg/v` gives `mypkg/v1.2.3`, a `-mypkg` suffix gives `1.2.3-mypkg`. The
   suffix field previews the latest tag and the next ones.
-- **Upstreams**: `Space` or `x` toggles a forge.
-- **Origin** and **Scheme**.
+- **Forge** and **Scheme**: `←`/`→` pick an option.
 
 `Enter` moves through the fields and saves on the last one; `Ctrl+s` saves from any field. `Esc`
 leaves without saving.
@@ -208,7 +198,7 @@ leaves without saving.
 
 Pick patch, minor or major. Each option shows the tag it'll make: the repo's highest local tag in
 its tag format, bumped, or bumped from `0.0.0` if there isn't one. Confirm, and gitkeeper makes an
-annotated tag at `HEAD` and pushes just that tag to `origin`, which reaches every upstream.
+annotated tag at `HEAD` and pushes just that tag to `origin`.
 
 - If the push fails, the tag stays local. Retry with `git push origin <tag>`.
 - Tags are read locally, so `git fetch --tags` first if someone else might have released.
@@ -275,8 +265,7 @@ the app.
   ],
   "repos": {
     "bkenks/myrepo": {
-      "upstreams": ["forgejo", "github"],
-      "origin": "forgejo",
+      "forge": "forgejo",
       "scheme": "https",
       "tagPrefix": "v"
     }

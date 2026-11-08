@@ -1,5 +1,5 @@
-// Package forgepick renders the registry forges as checkbox rows for the
-// screens that choose a repo's upstreams and origin.
+// Package forgepick renders the registry forges as single-choice rows for the
+// screen that chooses a repo's forge.
 package forgepick
 
 import (
@@ -10,42 +10,27 @@ import (
 
 // item is a registry forge as shown in a selection list.
 type item struct {
-	name, host      string
-	checked, origin bool
+	name, host string
+	selected   bool
 }
 
 func (i item) Title() string {
 	box := styles.GlyphCheckOff
-	if i.checked {
+	if i.selected {
 		box = styles.GlyphCheckOn
 	}
-	t := box + " " + i.name
-	if i.origin {
-		t += " " + styles.GlyphOrigin
-	}
-	return t
+	return box + " " + i.name
 }
 
-func (i item) Description() string {
-	if i.origin {
-		return i.host + "  · origin (fetch)"
-	}
-	return i.host
-}
+func (i item) Description() string { return i.host }
 
 func (i item) FilterValue() string { return i.name }
 
-// Items builds one row per forge, checked when link pushes to it and marked
-// when it is link's origin.
-func Items(forges []config.Forge, link config.RepoLink) []list.Item {
+// Items builds one row per forge, marking the one named selected.
+func Items(forges []config.Forge, selected string) []list.Item {
 	items := make([]list.Item, len(forges))
 	for i, f := range forges {
-		items[i] = item{
-			name:    f.Name,
-			host:    f.Host,
-			checked: link.HasUpstream(f.Name),
-			origin:  link.Origin == f.Name,
-		}
+		items[i] = item{name: f.Name, host: f.Host, selected: f.Name == selected}
 	}
 	return items
 }

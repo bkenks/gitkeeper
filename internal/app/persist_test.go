@@ -25,7 +25,7 @@ func taggedRepoConfig() config.Config {
 	cfg := config.Default()
 	cfg.Forges = []config.Forge{{Name: "github", Host: "github.com"}}
 	cfg.Repos["me/demo"] = config.RepoLink{
-		Upstreams: []string{"github"}, Origin: "github", TagPrefix: "v",
+		Forge: "github", TagPrefix: "v",
 	}
 	return cfg
 }
@@ -35,21 +35,21 @@ func TestForgeRegistryEditsKeepRepoTagFormat(t *testing.T) {
 
 	m.Update(events.ForgesChanged{
 		Forges: []config.Forge{{Name: "gh", Host: "github.com"}},
-		Repos:  map[string]config.RepoLink{"me/demo": {Upstreams: []string{"gh"}, Origin: "gh"}},
+		Repos:  map[string]config.RepoLink{"me/demo": {Forge: "gh"}},
 	})
 
 	link := config.Load().Repos["me/demo"]
 	if link.TagPrefix != "v" {
 		t.Errorf("tag format lost: %+v", link)
 	}
-	if link.Origin != "gh" {
+	if link.Forge != "gh" {
 		t.Errorf("forge rename not applied: %+v", link)
 	}
 }
 
 func TestAppSaveKeepsEditWrittenByAnotherProcess(t *testing.T) {
 	cfg := taggedRepoConfig()
-	cfg.Repos["me/demo"] = config.RepoLink{Upstreams: []string{"github"}, Origin: "github"}
+	cfg.Repos["me/demo"] = config.RepoLink{Forge: "github"}
 	m := newPersistedApp(t, cfg)
 
 	if _, err := config.Update(func(c *config.Config) {
@@ -73,7 +73,7 @@ func TestUnlinkingEveryForgeKeepsRepoTagFormat(t *testing.T) {
 	m.Update(events.RepoSettingsChanged{Key: "me/demo", Link: config.RepoLink{TagPrefix: "v"}})
 
 	link, ok := config.Load().Repos["me/demo"]
-	if !ok || link.TagPrefix != "v" || link.Origin != "" {
+	if !ok || link.TagPrefix != "v" || link.Forge != "" {
 		t.Errorf("link = %+v ok=%v, want only the tag format kept", link, ok)
 	}
 }
@@ -92,7 +92,7 @@ func TestRepoSettingsSaveTagFormat(t *testing.T) {
 	m := newPersistedApp(t, taggedRepoConfig())
 
 	m.Update(events.RepoSettingsChanged{Key: "me/demo", Link: config.RepoLink{
-		Upstreams: []string{"github"}, Origin: "github", TagPrefix: "mypkg/v", TagSuffix: "-x",
+		Forge: "github", TagPrefix: "mypkg/v", TagSuffix: "-x",
 	}})
 
 	link := config.Load().Repos["me/demo"]
@@ -103,7 +103,7 @@ func TestRepoSettingsSaveTagFormat(t *testing.T) {
 
 func TestRepoDeletedRemovesTheDeletedRepoLink(t *testing.T) {
 	cfg := taggedRepoConfig()
-	cfg.Repos["me/other"] = config.RepoLink{Upstreams: []string{"github"}, Origin: "github"}
+	cfg.Repos["me/other"] = config.RepoLink{Forge: "github"}
 	m := newPersistedApp(t, cfg)
 
 	m.Update(events.RepoDeleted{Key: "me/other"})

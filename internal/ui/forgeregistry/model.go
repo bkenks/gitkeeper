@@ -104,8 +104,8 @@ func (m *Model) Init() tea.Cmd { return nil }
 func (m *Model) recomputeUses() {
 	uses := map[string]int{}
 	for _, link := range m.repos {
-		for _, f := range link.Upstreams {
-			uses[f]++
+		if link.Forge != "" {
+			uses[link.Forge]++
 		}
 	}
 	m.inUse = uses
@@ -161,9 +161,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.forges) > 0 {
 			idx := m.list.Index()
 			name := m.forges[idx].Name
-			// Cascade the removal into every repo that links this forge:
-			// drop it, and promote another upstream to origin (or leave
-			// the repo unlinked) when it was the origin.
+			// Cascade the removal into every repo that links this forge,
+			// leaving it unlinked.
 			m.applyForgeRemoved(name)
 			m.forges = append(m.forges[:idx], m.forges[idx+1:]...)
 			m.recomputeUses()
@@ -261,24 +260,21 @@ func (m *Model) saveEdit() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// applyForgeRemoved drops forge `name` from every repo's upstreams. When it was
-// a repo's origin, the first remaining upstream takes over; if none remain the
-// repo is left unlinked (empty origin).
+// applyForgeRemoved unlinks every repo linked to forge `name`.
 func (m *Model) applyForgeRemoved(name string) {
-	for key, link := range m.repos {
-		if link.HasUpstream(name) {
-			link.RemoveUpstream(name)
-			m.repos[key] = link
-		}
-	}
+	m.replaceForge(name, "")
 }
 
-// applyForgeRenamed rewrites forge `old` to `new` in every repo's upstreams
-// (and their origin), so a rename never orphans a repo.
+// applyForgeRenamed relinks every repo on forge `old` to `newName`, so a
+// rename never orphans a repo.
 func (m *Model) applyForgeRenamed(old, newName string) {
+	m.replaceForge(old, newName)
+}
+
+func (m *Model) replaceForge(old, newName string) {
 	for key, link := range m.repos {
-		if link.HasUpstream(old) {
-			link.RenameUpstream(old, newName)
+		if link.Forge == old {
+			link.Forge = newName
 			m.repos[key] = link
 		}
 	}

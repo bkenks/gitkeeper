@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 )
 
@@ -112,72 +111,25 @@ func TestLoadRejectsUnknownDefaultProtocol(t *testing.T) {
 func TestConfigCloneSharesNoState(t *testing.T) {
 	original := Default()
 	original.Forges = []Forge{{Name: "github", Host: "github.com"}}
-	original.Repos["ns/repo"] = RepoLink{Upstreams: []string{"github"}, Origin: "github"}
+	original.Repos["ns/repo"] = RepoLink{Forge: "github"}
 
 	clone := original.Clone()
 	clone.Forges[0].Name = "changed"
-	link := clone.Repos["ns/repo"]
-	link.Upstreams[0] = "changed"
 	clone.Repos["ns/other"] = RepoLink{}
 
 	if original.Forges[0].Name != "github" {
 		t.Error("clone shares Forges")
-	}
-	if original.Repos["ns/repo"].Upstreams[0] != "github" {
-		t.Error("clone shares a link's Upstreams")
 	}
 	if _, ok := original.Repos["ns/other"]; ok {
 		t.Error("clone shares the Repos map")
 	}
 }
 
-func TestRepoLinkEditsNeverAliasTheOriginal(t *testing.T) {
-	upstreams := make([]string, 2, 4)
-	copy(upstreams, []string{"a", "b"})
-	original := RepoLink{Upstreams: upstreams, Origin: "a"}
+func TestRepoLinkWithForgeLinkKeepsTagFormat(t *testing.T) {
+	stored := RepoLink{Forge: "a", TagPrefix: "v", TagSuffix: "-pkg"}
 
-	edited := original
-	edited.RemoveUpstream("a")
-	edited.ToggleUpstream("c")
-	edited.SetOrigin("d")
-
-	if !slices.Equal(original.Upstreams, []string{"a", "b"}) || original.Origin != "a" {
-		t.Errorf("original changed: %+v", original)
-	}
-	if !slices.Equal(edited.Upstreams, []string{"b", "c", "d"}) || edited.Origin != "d" {
-		t.Errorf("edited = %+v", edited)
-	}
-}
-
-func TestRepoLinkRemovingOriginPromotesNextUpstream(t *testing.T) {
-	link := RepoLink{Upstreams: []string{"a", "b"}, Origin: "a"}
-	link.ToggleUpstream("a")
-	if link.Origin != "b" {
-		t.Errorf("Origin = %q, want b", link.Origin)
-	}
-	link.ToggleUpstream("b")
-	if link.Origin != "" || len(link.Upstreams) != 0 {
-		t.Errorf("link = %+v, want unlinked", link)
-	}
-	link.ToggleUpstream("c")
-	if link.Origin != "c" {
-		t.Errorf("first upstream added should become origin, got %q", link.Origin)
-	}
-}
-
-func TestRepoLinkRenameUpstreamDropsDuplicate(t *testing.T) {
-	link := RepoLink{Upstreams: []string{"old", "new"}, Origin: "old"}
-	link.RenameUpstream("old", "new")
-	if !slices.Equal(link.Upstreams, []string{"new"}) || link.Origin != "new" {
-		t.Errorf("link = %+v", link)
-	}
-}
-
-func TestRepoLinkWithForgeLinksKeepsTagFormat(t *testing.T) {
-	stored := RepoLink{Origin: "a", TagPrefix: "v", TagSuffix: "-pkg"}
-
-	got := stored.WithForgeLinks(RepoLink{Origin: "b"})
-	if got.TagPrefix != "v" || got.TagSuffix != "-pkg" {
+	got := stored.WithForgeLink(RepoLink{Forge: "b"})
+	if got.Forge != "b" || got.TagPrefix != "v" || got.TagSuffix != "-pkg" {
 		t.Errorf("got %+v, want the tag format kept", got)
 	}
 }

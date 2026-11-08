@@ -256,15 +256,14 @@ func (m *ModelManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case events.CloneRepoExec:
 			if msg.Err != nil {
 				m.cloneFail++
-			} else if msg.Clone.Origin != "" {
+			} else if msg.Clone.Forge != "" {
 				// Clone succeeded: record the link and rewrite the repo to a
-				// placeholder origin resolved to its origin forge, plus a push
-				// URL per upstream.
+				// placeholder origin resolved to its forge.
 				key := msg.Clone.URL.Key()
 				link := msg.Clone.Link()
 				cmds = append(cmds,
 					m.saveConfig("repo link", func(c *config.Config) {
-						c.Repos[key] = c.Repos[key].WithForgeLinks(link)
+						c.Repos[key] = c.Repos[key].WithForgeLink(link)
 					}),
 					m.renderGitConfig(key, link),
 				)
@@ -285,19 +284,20 @@ func (m *ModelManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, m.saveConfig("forges", func(c *config.Config) {
 				c.Forges = msg.Forges
 				for key, link := range msg.Repos {
-					c.Repos[key] = c.Repos[key].WithForgeLinks(link)
+					c.Repos[key] = c.Repos[key].WithForgeLink(link)
 				}
 			}))
 
-			// Re-render the git remotes for any repo whose links or forge hosts
-			// changed (promotion after a delete, a rename, or a host edit). A
-			// repo left unlinked keeps its existing remote — the insteadOf rule
-			// already written still resolves.
+			// Re-render the git remote for any repo whose forge host changed
+			// (a host edit). A repo left unlinked by a delete keeps its
+			// existing remote — the insteadOf rule already written still
+			// resolves.
 			for key, link := range m.cfg.Repos {
-				if _, ok := m.cfg.ForgeByName(link.Origin); !ok {
-					continue // unlinked or dangling origin; leave the existing config alone
+				newForge, ok := m.cfg.ForgeByName(link.Forge)
+				if !ok {
+					continue // unlinked or dangling forge; leave the existing config alone
 				}
-				if slices.Equal(remoteHosts(prev, prev.Repos[key]), remoteHosts(m.cfg, link)) {
+				if oldForge, _ := prev.ForgeByName(prev.Repos[key].Forge); oldForge.Host == newForge.Host {
 					continue
 				}
 				cmds = append(cmds, m.renderGitConfig(key, link))
@@ -322,7 +322,7 @@ func (m *ModelManager) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					c.Repos[msg.Key] = msg.Link
 				}
 			}))
-			if msg.Link.Origin != "" {
+			if msg.Link.Forge != "" {
 				cmds = append(cmds, m.renderGitConfig(msg.Key, msg.Link))
 			}
 			cmds = append(cmds, commands.RefreshReposCmd())
@@ -494,20 +494,6 @@ func (m *ModelManager) renderGitConfig(key string, link config.RepoLink) tea.Cmd
 		return m.toastCmd(events.ToastError, fmt.Sprintf("%s: %v", key, err))
 	}
 	return nil
-}
-
-// remoteHosts lists the host each of the link's forges resolves to in cfg,
-// origin first, so a change to any of them shows up as a difference. A forge
-// missing from the registry resolves to "".
-func remoteHosts(cfg config.Config, link config.RepoLink) []string {
-	names := append([]string{link.Origin}, link.Upstreams...)
-	hosts := make([]string, len(names))
-	for i, name := range names {
-		if forge, ok := cfg.ForgeByName(name); ok {
-			hosts[i] = forge.Host
-		}
-	}
-	return hosts
 }
 
 // keybindClashes describes each custom keybind whose key the repo list already

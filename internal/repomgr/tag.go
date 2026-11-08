@@ -32,7 +32,7 @@ func CheckTagName(name string) error {
 }
 
 // ReleaseTag creates an annotated tag at HEAD and pushes just that tag to
-// origin, which fans out to every upstream through the origin's push URLs.
+// origin.
 // Git is told not to prompt for credentials, since the TUI owns the terminal.
 // When the push fails the tag stays in the local repo, and the error says so.
 func ReleaseTag(dir, tag string) error {

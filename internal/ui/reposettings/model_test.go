@@ -2,7 +2,6 @@ package reposettings
 
 import (
 	"errors"
-	"slices"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -14,7 +13,7 @@ import (
 
 var (
 	enterKey = tea.KeyPressMsg{Code: tea.KeyEnter}
-	spaceKey = tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
+	rightKey = tea.KeyPressMsg{Code: tea.KeyRight}
 	escKey   = tea.KeyPressMsg{Code: tea.KeyEscape}
 )
 
@@ -35,7 +34,7 @@ func linkedConfig() config.Config {
 		{Name: "forgejo", Host: "fj.example.com"},
 	}
 	cfg.Repos["me/demo"] = config.RepoLink{
-		Upstreams: []string{"github", "forgejo"}, Origin: "github", Scheme: config.SchemeSSH,
+		Forge: "github", Scheme: config.SchemeSSH,
 	}
 	return cfg
 }
@@ -71,42 +70,29 @@ func TestSubmitSavesTagFormatAndKeepsForgeLinks(t *testing.T) {
 	if link.TagPrefix != "mypkg/v" || link.TagSuffix != "-x" {
 		t.Errorf("tag format = %q/%q, want trimmed mypkg/v and -x", link.TagPrefix, link.TagSuffix)
 	}
-	if !slices.Equal(link.Upstreams, []string{"github", "forgejo"}) || link.Origin != "github" ||
-		link.Scheme != config.SchemeSSH {
+	if link.Forge != "github" || link.Scheme != config.SchemeSSH {
 		t.Errorf("forge links = %+v, want them unchanged", link)
 	}
 }
 
-func TestUncheckingOriginMovesOriginToRemainingUpstream(t *testing.T) {
+func TestChangingForgeRelinksRepo(t *testing.T) {
 	m := newTestModel(linkedConfig(), nil)
 	press(m, enterKey)
 	press(m, enterKey)
-	press(m, spaceKey)
+	press(m, rightKey)
 
-	link := submit(t, m)
-
-	if !slices.Equal(link.Upstreams, []string{"forgejo"}) || link.Origin != "forgejo" {
-		t.Errorf("link = %+v, want forgejo as the only upstream and origin", link)
+	if link := submit(t, m); link.Forge != "forgejo" {
+		t.Errorf("link = %+v, want forgejo as the forge", link)
 	}
 }
 
-func TestEditedKeepsOriginAmongUpstreams(t *testing.T) {
-	cases := []struct {
-		upstreams  []string
-		origin     string
-		wantOrigin string
-	}{
-		{[]string{"forgejo"}, "github", "forgejo"},
-		{nil, "github", ""},
-		{[]string{"github", "forgejo"}, "forgejo", "forgejo"},
-	}
-	for _, c := range cases {
-		m := New(linkedConfig(), "me/demo", nil, nil)
-		m.link.Upstreams, m.link.Origin = c.upstreams, c.origin
-		if got := m.edited().Origin; got != c.wantOrigin {
-			t.Errorf("upstreams %v, origin %q: edited origin = %q, want %q",
-				c.upstreams, c.origin, got, c.wantOrigin)
-		}
+func TestForgeMissingFromRegistryStaysSelected(t *testing.T) {
+	cfg := linkedConfig()
+	cfg.Repos["me/demo"] = config.RepoLink{Forge: "gone"}
+	m := newTestModel(cfg, nil)
+
+	if link := submit(t, m); link.Forge != "gone" {
+		t.Errorf("link = %+v, want the unregistered forge kept", link)
 	}
 }
 
@@ -127,7 +113,7 @@ func TestEmptyRegistryStillSavesTagFormat(t *testing.T) {
 	m := newTestModel(config.Default(), nil)
 	formtest.Type(m, "v")
 
-	if link := submit(t, m); link.TagPrefix != "v" || link.Origin != "" {
+	if link := submit(t, m); link.TagPrefix != "v" || link.Forge != "" {
 		t.Errorf("link = %+v, want only the prefix set", link)
 	}
 }
@@ -176,7 +162,7 @@ func TestSaveKeySavesFromAnyField(t *testing.T) {
 		t.Fatal("ctrl+s did not save")
 	}
 	changed, ok := emitted[0].(events.RepoSettingsChanged)
-	if !ok || changed.Link.TagPrefix != "v" || changed.Link.Origin != "github" {
-		t.Errorf("emitted %v, want RepoSettingsChanged with prefix v and origin github", emitted)
+	if !ok || changed.Link.TagPrefix != "v" || changed.Link.Forge != "github" {
+		t.Errorf("emitted %v, want RepoSettingsChanged with prefix v and forge github", emitted)
 	}
 }
