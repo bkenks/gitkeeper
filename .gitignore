@@ -51,3 +51,4 @@ __pycache__/
 .DS_Store
 # Claude Code worktrees / local state
 .claude/worktrees/
+AGENTS.md
